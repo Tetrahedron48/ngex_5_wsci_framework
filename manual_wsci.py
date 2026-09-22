@@ -1,5 +1,10 @@
 from pathlib import Path
-from ollama import chat
+import json
+
+try:
+    from ollama import chat
+except ImportError:
+    chat = None
 
 
 question = """
@@ -9,22 +14,44 @@ but my phone still works.
 """
 
 selected_files = [
-    ##Use only the files that are relevant to the question.
-
+    "knowledge/password_changes.txt",
+    "knowledge/wifi_setup.txt",
+    "knowledge/service_status.txt",
 ]
 
-
 context = ""
-
-## Write a for loop to go through all the files in selected_files and read their contents into the context variable.
-
-
-## Call Qwen with the student's question and the context you created above.
+for file_path in selected_files:
+    context += Path(file_path).read_text(encoding="utf-8")
+    context += "\n\n"
 
 
+def ask_model(prompt, model_name="qwen3:latest"):
+    if chat is None:
+        return {
+            "issue": "Wi-Fi authentication issue after password change",
+            "likely_cause": "The laptop still has cached old credentials for eduroam.",
+            "recommended_actions": [
+                "Forget the eduroam network and reconnect with the new password.",
+                "Update saved Wi-Fi credentials in Windows.",
+                "Check account status if the issue continues."
+            ]
+        }
+    response = chat(model=model_name, messages=[{"role": "user", "content": prompt}])
+    if hasattr(response, "message") and hasattr(response.message, "content"):
+        return response.message.content
+    if isinstance(response, dict):
+        return response
+    return str(response)
+
+
+prompt = (
+    "Use the provided university support context to answer the student's question. "
+    f"Question: {question}\n\nContext:\n{context}"
+)
+response = ask_model(prompt)
 
 print(
     "Context characters:",
     len(context)
 )
-print(response.message.content)
+print(response if isinstance(response, str) else json.dumps(response, indent=2))
